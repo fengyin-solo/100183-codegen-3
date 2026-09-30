@@ -28,8 +28,13 @@ class Store:
         return None
 
     def overview(self) -> dict[str, object]:
+        # 监护台账三表由 GuardService 聚合，不按通用模块逐表统计。
+        from app.services.guard import GUARD_TABLES, guard_service
+
         modules: list[dict[str, object]] = []
         for name in self.module_names():
+            if name in GUARD_TABLES:
+                continue
             rows = self.rows(name)
             modules.append({
                 "name": name,
@@ -37,10 +42,14 @@ class Store:
                 "pending": sum(1 for row in rows if row.get("pending")),
                 "abnormal": sum(1 for row in rows if row.get("abnormal")),
             })
+        guard_module = guard_service.overview_module()
+        modules.append(guard_module)
+        guard_stats = guard_service.overview_summary()
         cards = [
             {"label": "业务模块", "value": len(modules)},
             {"label": "今日新增", "value": sum(int(item["created"]) for item in modules)},
             {"label": "待处理", "value": sum(int(item["pending"]) for item in modules)},
+            {"label": "在建监护", "value": guard_stats["在建监护数"]},
             {"label": "异常量", "value": sum(int(item["abnormal"]) for item in modules)},
         ]
         return {"cards": cards, "modules": modules}
