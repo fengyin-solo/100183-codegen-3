@@ -28,8 +28,13 @@ class Store:
         return None
 
     def overview(self) -> dict[str, object]:
+        # guard_* 是第三方施工监护台账的内部表（项目/交底/旁站记录），
+        # 不单独作为业务模块展示；监护口径统一在卡片「在建监护数」里呈现。
+        guard_names = {"guard_project", "guard_briefing", "guard_watch"}
         modules: list[dict[str, object]] = []
         for name in self.module_names():
+            if name in guard_names:
+                continue
             rows = self.rows(name)
             modules.append({
                 "name": name,
@@ -37,11 +42,16 @@ class Store:
                 "pending": sum(1 for row in rows if row.get("pending")),
                 "abnormal": sum(1 for row in rows if row.get("abnormal")),
             })
+        # 在建监护数：只统计未完工项目，与待监护视图（/api/guard?scope=pending）同口径。
+        active_guard = sum(
+            1 for row in self.rows("guard_project") if row.get("status") != "已完工"
+        )
         cards = [
             {"label": "业务模块", "value": len(modules)},
             {"label": "今日新增", "value": sum(int(item["created"]) for item in modules)},
             {"label": "待处理", "value": sum(int(item["pending"]) for item in modules)},
             {"label": "异常量", "value": sum(int(item["abnormal"]) for item in modules)},
+            {"label": "在建监护数", "value": active_guard},
         ]
         return {"cards": cards, "modules": modules}
 
